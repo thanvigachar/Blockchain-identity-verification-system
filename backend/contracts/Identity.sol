@@ -2,28 +2,46 @@
 pragma solidity ^0.8.18;
 
 contract Identity {
+    address public admin;
 
     struct User {
         string ipfsHash;
         bool isVerified;
+        address walletAddress;
     }
 
-    mapping(address => User) public users;
+    mapping(string => User) public usersBySrn;
 
-    event Registered(address user, string hash);
-    event Verified(address user);
+    event Registered(string srn, string hash);
+    event Verified(string srn);
 
-    function register(string memory _ipfsHash) public {
-        users[msg.sender] = User(_ipfsHash, false);
-        emit Registered(msg.sender, _ipfsHash);
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can verify identities");
+        _;
     }
 
-    function verify(address _user) public {
-        users[_user].isVerified = true;
-        emit Verified(_user);
+    constructor() {
+        admin = msg.sender;
     }
 
-    function getUser(address _user) public view returns (string memory, bool) {
-        return (users[_user].ipfsHash, users[_user].isVerified);
+    function register(string memory _srn, string memory _ipfsHash) public {
+        require(bytes(_srn).length > 0, "SRN is required");
+        require(bytes(_ipfsHash).length > 0, "IPFS hash is required");
+        require(usersBySrn[_srn].walletAddress == address(0), "Identity already registered");
+
+        usersBySrn[_srn] = User(_ipfsHash, false, msg.sender);
+        emit Registered(_srn, _ipfsHash);
+    }
+
+    function verify(string memory _srn) public onlyAdmin {
+        require(usersBySrn[_srn].walletAddress != address(0), "Identity not found");
+        require(!usersBySrn[_srn].isVerified, "Identity already verified");
+
+        usersBySrn[_srn].isVerified = true;
+        emit Verified(_srn);
+    }
+
+    function getUser(string memory _srn) public view returns (string memory, bool, address) {
+        return (usersBySrn[_srn].ipfsHash, usersBySrn[_srn].isVerified, usersBySrn[_srn].walletAddress);
     }
 }
